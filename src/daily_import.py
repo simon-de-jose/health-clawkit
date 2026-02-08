@@ -19,6 +19,8 @@ import sys
 # Add parent directory to path to import from same package
 sys.path.insert(0, str(Path(__file__).parent))
 from import_healthkit import import_csv
+from import_medications import import_medications_csv
+from import_workouts import import_workouts_csv
 from validate import run_validation
 from config import get_db_path, get_icloud_folder
 
@@ -106,7 +108,22 @@ def run_daily_import(dry_run=False):
     print("\n⚙️  Importing...")
     for csv_file in new_files:
         print(f"\n→ {csv_file.name}")
-        rows = import_csv(csv_file)
+        
+        # Route to appropriate importer based on filename
+        if csv_file.name.startswith("Medications-"):
+            rows = import_medications_csv(csv_file)
+        elif csv_file.name.startswith("Workouts-"):
+            rows = import_workouts_csv(csv_file)
+        elif csv_file.name.startswith("HealthMetrics-"):
+            rows = import_csv(csv_file)
+        elif csv_file.name.startswith("HaishanYe_glucose_"):
+            # Skip glucose files - handled separately by import_libre.py
+            print(f"⏭️  Skipping glucose file (handled by import_libre.py)")
+            stats["skipped"] += 1
+            continue
+        else:
+            print(f"⚠️  Unknown file type, attempting HealthKit import...")
+            rows = import_csv(csv_file)
         
         if rows < 0:
             stats["errors"] += 1

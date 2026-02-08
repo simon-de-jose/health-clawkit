@@ -81,6 +81,67 @@ def init_database():
             )
         """)
         
+        # Create medications table
+        conn.execute("""
+            CREATE SEQUENCE IF NOT EXISTS seq_medications START 1
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS medications (
+                id INTEGER PRIMARY KEY DEFAULT nextval('seq_medications'),
+                timestamp TIMESTAMP NOT NULL,
+                scheduled_at TIMESTAMP,
+                medication VARCHAR NOT NULL,
+                dosage DOUBLE,
+                scheduled_dosage DOUBLE,
+                unit VARCHAR,
+                status VARCHAR,
+                UNIQUE(timestamp, medication)
+            )
+        """)
+        
+        # Create index for medications queries
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_medications_timestamp 
+            ON medications(timestamp)
+        """)
+        
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_medications_medication 
+            ON medications(medication)
+        """)
+        
+        # Create workouts table
+        conn.execute("""
+            CREATE SEQUENCE IF NOT EXISTS seq_workouts START 1
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS workouts (
+                id INTEGER PRIMARY KEY DEFAULT nextval('seq_workouts'),
+                start_time TIMESTAMP NOT NULL,
+                end_time TIMESTAMP,
+                type VARCHAR NOT NULL,
+                duration_seconds INTEGER,
+                total_energy_kcal DOUBLE,
+                active_energy_kcal DOUBLE,
+                max_heart_rate DOUBLE,
+                avg_heart_rate DOUBLE,
+                distance_km DOUBLE,
+                step_count INTEGER,
+                UNIQUE(start_time, type)
+            )
+        """)
+        
+        # Create index for workouts queries
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_workouts_start_time 
+            ON workouts(start_time)
+        """)
+        
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_workouts_type 
+            ON workouts(type)
+        """)
+        
         # Verify tables exist
         tables = conn.execute("""
             SELECT table_name 
@@ -89,7 +150,7 @@ def init_database():
         """).fetchall()
         
         table_names = [t[0] for t in tables]
-        expected = ['readings', 'metrics', 'imports']
+        expected = ['readings', 'metrics', 'imports', 'medications', 'workouts']
         
         print(f"✅ Database initialized: {DB_PATH}")
         print(f"✅ Created tables: {', '.join(sorted(table_names))}")
