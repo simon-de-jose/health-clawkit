@@ -12,6 +12,7 @@ Usage:
 
 import duckdb
 import argparse
+import shutil
 from pathlib import Path
 from datetime import datetime
 import sys
@@ -133,6 +134,60 @@ def run_daily_import(dry_run=False):
     
     return stats
 
+def move_imported_files(dry_run=False):
+    """
+    Move all imported CSV files (and non-CSV files like JSON/ZIP) to an
+    'imported/' subfolder to keep the source folder clean.
+
+    Only moves CSVs that are tracked in the imports table.
+    JSON and ZIP files are always moved (not used by the pipeline).
+
+    Args:
+        dry_run: If True, only report what would be moved
+
+    Returns:
+        int: Number of files moved
+    """
+    imported_dir = ICLOUD_FOLDER / "imported"
+    imported_filenames = get_imported_files()
+
+    # Collect files to move:
+    # 1. CSVs that are in the imports table
+    # 2. JSON and ZIP files (not used by pipeline)
+    files_to_move = []
+    for f in sorted(ICLOUD_FOLDER.iterdir()):
+        if f.is_dir():
+            continue
+        if f.suffix == ".csv" and f.name in imported_filenames:
+            files_to_move.append(f)
+        elif f.suffix in (".json", ".zip"):
+            files_to_move.append(f)
+
+    if not files_to_move:
+        print("📁 No files to move")
+        return 0
+
+    print(f"\n📦 Moving {len(files_to_move)} file(s) to imported/")
+    for f in files_to_move:
+        print(f"   → {f.name}")
+
+    if dry_run:
+        print("🏃 Dry run — no files moved")
+        return 0
+
+    imported_dir.mkdir(exist_ok=True)
+    moved = 0
+    for f in files_to_move:
+        try:
+            shutil.move(str(f), str(imported_dir / f.name))
+            moved += 1
+        except Exception as e:
+            print(f"   ⚠️  Failed to move {f.name}: {e}")
+
+    print(f"✅ Moved {moved} file(s)")
+    return moved
+
+
 def print_summary(stats):
     """Print summary of import run."""
     print("\n" + "="*60)
@@ -182,6 +237,12 @@ def main():
         validation_report = run_validation(verbose=False)
         if validation_report:
             validation_report.print_report(verbose=False)
+    
+    # Move imported files to imported/ subfolder
+    if stats['errors'] == 0:
+        move_imported_files(dry_run=args.dry_run)
+    else:
+        print("\n⚠️  Skipping file move due to import errors")
     
     # Exit with error code if there were errors
     sys.exit(1 if stats['errors'] > 0 else 0)
