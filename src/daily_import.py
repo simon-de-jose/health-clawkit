@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from import_healthkit import import_csv
 from import_medications import import_medications_csv
 from import_workouts import import_workouts_csv
+from import_cycletracking import import_cycletracking_csv
 from validate import run_validation
 from config import get_db_path, get_icloud_folder
 
@@ -115,6 +116,8 @@ def run_daily_import(dry_run=False):
             rows = import_medications_csv(csv_file)
         elif csv_file.name.startswith("Workouts-"):
             rows = import_workouts_csv(csv_file)
+        elif csv_file.name.startswith("CycleTracking-"):
+            rows = import_cycletracking_csv(csv_file)
         elif csv_file.name.startswith("HealthMetrics-"):
             rows = import_csv(csv_file)
         elif csv_file.name.startswith("HaishanYe_glucose_"):
