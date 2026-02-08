@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Health Detail</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+</head>
+<body>
+  <div class="detail-header">
+    <span class="back-button" onclick="window.location.href='/'">←</span>
+    <h1 id="detail-title"></h1>
+  </div>
+
+  <div class="container">
+    <div class="time-range-selector" id="time-range-selector"></div>
+    
+    <div class="chart-container">
+      <div id="detail-chart" style="width: 100%; height: 350px;"></div>
+    </div>
+    
+    <div class="stats-grid" id="stats-grid"></div>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const metric = urlParams.get('metric');
+    let currentRange = 'week';
+    let chartInstance = null;
+    
+    const metricConfig = {
+      'energy': { icon: '🔥', title: 'Active Energy', color: '#FF9500' },
+      'steps': { icon: '👟', title: 'Steps', color: '#FF9500' },
+      'heart': { icon: '❤️', title: 'Resting Heart Rate', color: '#FF3B30' },
+      'hrv': { icon: '💜', title: 'Heart Rate Variability', color: '#5E5CE6' },
+      'sleep': { icon: '🌙', title: 'Sleep', color: '#5E5CE6' }
+    };
+    
+    const timeRanges = [
+      { label: 'Day', value: 'day' },
+      { label: 'Week', value: 'week' },
+      { label: 'Month', value: 'month' },
+      { label: '3M', value: '3month' },
+      { label: '6M', value: '6month' },
+      { label: 'Year', value: 'year' },
+      { label: '5Y', value: '5year' },
+      { label: 'All', value: 'all' }
+    ];
+    
+    // Set title
+    const config = metricConfig[metric];
+    document.getElementById('detail-title').innerHTML = `${config.icon} <span style="color: ${config.color}">${config.title}</span>`;
+    
+    // Render time range selector
+    const selector = document.getElementById('time-range-selector');
+    timeRanges.forEach(range => {
+      const btn = document.createElement('button');
+      btn.className = 'time-range-btn' + (range.value === currentRange ? ' active' : '');
+      btn.textContent = range.label;
+      btn.dataset.range = range.value;
+      btn.addEventListener('click', () => {
+        currentRange = range.value;
+        document.querySelectorAll('.time-range-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        loadDetailData();
+      });
+      selector.appendChild(btn);
+    });
+    
+    async function loadDetailData() {
+      try {
+        const response = await fetch(`/api/detail/${metric}?range=${currentRange}`);
+        const data = await response.json();
+        
+        // Dispose previous chart
+        if (chartInstance) {
+          chartInstance.dispose();
+        }
+        
+        // Initialize ECharts with SVG renderer (crisp on Retina)
+        chartInstance = echarts.init(
+          document.getElementById('detail-chart'),
+          null,
+          { renderer: 'svg' }
+        );
+        
+        let option;
+        
+        if (data.type === 'bar') {
+          const dates = data.data.map(d => d.date).reverse();
+          const values = data.data.map(d => d.value).reverse();
+          
+          option = {
+            tooltip: {
+              trigger: 'axis',
+              backgroundColor: '#1c1c1e',
+              borderColor: '#2c2c2e',
+              textStyle: { color: '#fff' }
+            },
+            grid: {
+              left: 60,
+              right: 20,
+              top: 20,
+              bottom: 40
+            },
+            xAxis: {
+              type: 'category',
+              data: dates,
+              axisLine: { lineStyle: { color: '#636366' } },
+              axisLabel: { color: '#8e8e93' }
+            },
+            yAxis: {
+              type: 'value',
+              axisLine: { lineStyle: { color: '#636366' } },
+              axisLabel: { color: '#8e8e93' },
+              splitLine: { lineStyle: { color: '#2c2c2e' } }
+            },
+            series: [{
+              type: 'bar',
+              data: values,
+              itemStyle: {
+                color: config.color,
+                borderRadius: [4, 4, 0, 0]
+              }
+            }]
+          };
+        } else if (data.type === 'line') {
+          const dates = data.data.map(d => d.date).reverse();
+          const values = data.data.map(d => d.value).reverse();
+          
+          option = {
+            tooltip: {
+              trigger: 'axis',
+              backgroundColor: '#1c1c1e',
+              borderColor: '#2c2c2e',
+              textStyle: { color: '#fff' }
+            },
+            grid: {
+              left: 60,
+              right: 20,
+              top: 20,
+              bottom: 40
+            },
+            xAxis: {
+              type: 'category',
+              data: dates,
+              axisLine: { lineStyle: { color: '#636366' } },
+              axisLabel: { color: '#8e8e93' }
+            },
+            yAxis: {
+              type: 'value',
+              axisLine: { lineStyle: { color: '#636366' } },
+              axisLabel: { color: '#8e8e93' },
+              splitLine: { lineStyle: { color: '#2c2c2e' } }
+            },
+            series: [{
+              type: 'line',
+              data: values,
+              smooth: true,
+              symbol: 'circle',
+              symbolSize: 6,
+              lineStyle: {
+                color: config.color,
+                width: 2
+              },
+              itemStyle: {
+                color: config.color
+              }
+            }]
+          };
+        } else if (data.type === 'stacked') {
+          const dates = data.data.map(d => d.date).reverse();
+          const remValues = data.data.map(d => d.rem).reverse();
+          const deepValues = data.data.map(d => d.deep).reverse();
+          const coreValues = data.data.map(d => d.core).reverse();
+          
+          option = {
+            tooltip: {
+              trigger: 'axis',
+              backgroundColor: '#1c1c1e',
+              borderColor: '#2c2c2e',
+              textStyle: { color: '#fff' }
+            },
+            legend: {
+              data: ['REM', 'Deep', 'Core'],
+              textStyle: { color: '#8e8e93' }
+            },
+            grid: {
+              left: 60,
+              right: 20,
+              top: 40,
+              bottom: 40
+            },
+            xAxis: {
+              type: 'category',
+              data: dates,
+              axisLine: { lineStyle: { color: '#636366' } },
+              axisLabel: { color: '#8e8e93' }
+            },
+            yAxis: {
+              type: 'value',
+              axisLine: { lineStyle: { color: '#636366' } },
+              axisLabel: { color: '#8e8e93' },
+              splitLine: { lineStyle: { color: '#2c2c2e' } }
+            },
+            series: [
+              {
+                name: 'REM',
+                type: 'bar',
+                stack: 'sleep',
+                data: remValues,
+                itemStyle: { color: '#C9B1FF' }
+              },
+              {
+                name: 'Deep',
+                type: 'bar',
+                stack: 'sleep',
+                data: deepValues,
+                itemStyle: { color: '#5E5CE6' }
+              },
+              {
+                name: 'Core',
+                type: 'bar',
+                stack: 'sleep',
+                data: coreValues,
+                itemStyle: { color: '#64D2FF' }
+              }
+            ]
+          };
+        }
+        
+        // Set option and force resize for proper display
+        chartInstance.setOption(option);
+        chartInstance.resize();
+        
+        // Render stats
+        const statsGrid = document.getElementById('stats-grid');
+        statsGrid.innerHTML = '';
+        
+        if (metric === 'steps') {
+          statsGrid.innerHTML = `
+            <div class="stat-card">
+              <div class="label">Total</div>
+              <div class="value accent-activity">${data.stats.total.toLocaleString()}</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Daily Avg</div>
+              <div class="value">${data.stats.avg.toLocaleString()}</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Best Day</div>
+              <div class="value">${data.stats.max.toLocaleString()}</div>
+            </div>
+          `;
+        } else if (metric === 'energy') {
+          statsGrid.innerHTML = `
+            <div class="stat-card">
+              <div class="label">Total</div>
+              <div class="value accent-activity">${data.stats.total.toLocaleString()} cal</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Daily Avg</div>
+              <div class="value">${data.stats.avg.toLocaleString()} cal</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Best Day</div>
+              <div class="value">${data.stats.max.toLocaleString()} cal</div>
+            </div>
+          `;
+        } else if (metric === 'heart') {
+          statsGrid.innerHTML = `
+            <div class="stat-card">
+              <div class="label">Average</div>
+              <div class="value accent-heart">${data.stats.avg} bpm</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Min</div>
+              <div class="value">${data.stats.min} bpm</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Max</div>
+              <div class="value">${data.stats.max} bpm</div>
+            </div>
+          `;
+        } else if (metric === 'hrv') {
+          statsGrid.innerHTML = `
+            <div class="stat-card">
+              <div class="label">Average</div>
+              <div class="value accent-sleep">${data.stats.avg} ms</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Min</div>
+              <div class="value">${data.stats.min} ms</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Max</div>
+              <div class="value">${data.stats.max} ms</div>
+            </div>
+          `;
+        } else if (metric === 'sleep') {
+          statsGrid.innerHTML = `
+            <div class="stat-card">
+              <div class="label">Avg Total</div>
+              <div class="value accent-sleep">${data.stats.avg_total.toFixed(1)} hrs</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Avg Deep</div>
+              <div class="value">${data.stats.avg_deep.toFixed(1)} hrs</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Avg REM</div>
+              <div class="value">${data.stats.avg_rem.toFixed(1)} hrs</div>
+            </div>
+          `;
+        }
+        
+      } catch (error) {
+        console.error('Error loading detail data:', error);
+      }
+    }
+    
+    // Load initial data
+    loadDetailData();
+  </script>
+</body>
+</html>

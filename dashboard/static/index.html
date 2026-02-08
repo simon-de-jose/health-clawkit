@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Health Dashboard</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+</head>
+<body>
+  <div class="header">
+    <h1>🏃 Health Dashboard</h1>
+  </div>
+
+  <div class="container">
+    <div id="loading" class="loading">Loading...</div>
+    <div id="grid" class="grid" style="display: none;"></div>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script>
+    // Load overview data
+    async function loadOverview() {
+      try {
+        const response = await fetch('/api/overview');
+        const data = await response.json();
+        
+        const grid = document.getElementById('grid');
+        const loading = document.getElementById('loading');
+        
+        // Active Energy card
+        grid.innerHTML += createSimpleCard({
+          icon: '🔥',
+          title: 'Active Energy',
+          value: data.energy.value,
+          unit: 'cal',
+          timestamp: 'Today',
+          sparkline: data.energy.sparkline,
+          color: '#FF9500',
+          metric: 'energy'
+        });
+        
+        // Steps card
+        grid.innerHTML += createSimpleCard({
+          icon: '👟',
+          title: 'Steps',
+          value: data.steps.value.toLocaleString(),
+          unit: 'steps',
+          timestamp: 'Today',
+          sparkline: data.steps.sparkline,
+          color: '#FF9500',
+          metric: 'steps'
+        });
+        
+        // Resting HR card
+        grid.innerHTML += createSimpleCard({
+          icon: '❤️',
+          title: 'Resting Heart Rate',
+          value: data.heart_rate.value,
+          unit: 'bpm',
+          timestamp: '7 days',
+          sparkline: data.heart_rate.sparkline,
+          color: '#FF3B30',
+          metric: 'heart'
+        });
+        
+        // HRV card
+        grid.innerHTML += createSimpleCard({
+          icon: '💜',
+          title: 'Heart Rate Variability',
+          value: data.hrv.value,
+          unit: 'ms',
+          timestamp: '7 days',
+          sparkline: data.hrv.sparkline,
+          color: '#5E5CE6',
+          metric: 'hrv'
+        });
+        
+        // Sleep card
+        grid.innerHTML += createSleepCard(data.sleep);
+        
+        // Show grid, hide loading
+        loading.style.display = 'none';
+        grid.style.display = 'grid';
+        
+        // Add click handlers
+        document.querySelectorAll('.card').forEach(card => {
+          card.addEventListener('click', function() {
+            const metric = this.dataset.metric;
+            window.location.href = `/detail.html?metric=${metric}`;
+          });
+        });
+        
+        // Render mini charts with the loaded data
+        renderMiniCharts(data);
+        
+      } catch (error) {
+        console.error('Error loading overview:', error);
+        document.getElementById('loading').textContent = 'Error loading data';
+      }
+    }
+    
+    function createSimpleCard({ icon, title, value, unit, timestamp, sparkline, color, metric }) {
+      return `
+        <div class="card" data-metric="${metric}">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="icon">${icon}</span>
+              <span class="title" style="color: ${color}">${title}</span>
+            </div>
+            <div class="card-timestamp">${timestamp} ›</div>
+          </div>
+          <div class="card-value">
+            <span class="number">${value}</span>
+            <span class="unit">${unit}</span>
+          </div>
+          <div class="card-chart">
+            <div id="chart-${metric}" style="width: 100%; height: 40px;"></div>
+          </div>
+        </div>
+      `;
+    }
+    
+    function createSleepCard(sleep) {
+      return `
+        <div class="card" data-metric="sleep">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="icon">🌙</span>
+              <span class="title accent-sleep">Sleep</span>
+            </div>
+            <div class="card-timestamp">Today ›</div>
+          </div>
+          <div class="card-value">
+            <span class="number">${sleep.hours}h ${sleep.minutes}m</span>
+          </div>
+          <div class="sleep-breakdown">
+            <div class="sleep-stat">
+              <span class="label">Deep</span>
+              <span class="value">${sleep.deep}m</span>
+            </div>
+            <div class="sleep-stat">
+              <span class="label">REM</span>
+              <span class="value">${sleep.rem}m</span>
+            </div>
+            <div class="sleep-stat">
+              <span class="label">Core</span>
+              <span class="value">${sleep.core}m</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    
+    function renderMiniCharts(data) {
+      // Render sparklines for each metric card
+      const metrics = ['energy', 'steps', 'heart', 'hrv'];
+      
+      for (const metric of metrics) {
+        const element = document.getElementById(`chart-${metric}`);
+        if (!element) continue;
+        
+        let sparklineData = [];
+        let color = '#FF9500';
+        
+        if (metric === 'energy') {
+          sparklineData = data.energy.sparkline || [];
+          color = '#FF9500';
+        } else if (metric === 'steps') {
+          sparklineData = data.steps.sparkline || [];
+          color = '#FF9500';
+        } else if (metric === 'heart') {
+          sparklineData = data.heart_rate.sparkline || [];
+          color = '#FF3B30';
+        } else if (metric === 'hrv') {
+          sparklineData = data.hrv.sparkline || [];
+          color = '#5E5CE6';
+        }
+        
+        // Initialize ECharts with SVG renderer
+        const chart = echarts.init(element, null, { renderer: 'svg' });
+        
+        const option = {
+          grid: {
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0
+          },
+          xAxis: {
+            type: 'category',
+            show: false,
+            data: sparklineData.map((_, i) => i)
+          },
+          yAxis: {
+            type: 'value',
+            show: false
+          },
+          series: [{
+            type: 'line',
+            data: sparklineData,
+            smooth: true,
+            symbol: 'none',
+            lineStyle: {
+              color: color,
+              width: 1.5
+            },
+            areaStyle: {
+              color: {
+                type: 'linear',
+                x: 0,
+                y: 0,
+                x2: 0,
+                y2: 1,
+                colorStops: [{
+                  offset: 0,
+                  color: color + '40'
+                }, {
+                  offset: 1,
+                  color: color + '00'
+                }]
+              }
+            }
+          }]
+        };
+        
+        chart.setOption(option);
+        chart.resize();
+      }
+    }
+    
+    // Load on page load
+    loadOverview();
+  </script>
+</body>
+</html>
