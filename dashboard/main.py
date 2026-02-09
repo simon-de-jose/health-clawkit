@@ -197,15 +197,15 @@ async def get_detail(metric: str, range: str = "week"):
     try:
         conn = duckdb.connect(DB_PATH, read_only=True)
         
-        # Map time ranges to SQL intervals and aggregation (matching Reflex logic)
+        # Map time ranges to SQL intervals and aggregation
         range_config = {
-            "day": ("7 days", "DATE(timestamp)"),
-            "week": ("4 weeks", "DATE(timestamp)"),
-            "month": ("3 months", "DATE(timestamp)"),
-            "3month": ("6 months", "DATE(timestamp)"),
-            "6month": ("12 months", "DATE_TRUNC('week', DATE(timestamp))"),
-            "year": ("2 years", "DATE_TRUNC('week', DATE(timestamp))"),
-            "5year": ("5 years", "DATE_TRUNC('week', DATE(timestamp)) - INTERVAL '7 days' * (EXTRACT(WEEK FROM DATE(timestamp))::int % 2)"),
+            "day": ("1 day", "DATE(timestamp)"),
+            "week": ("7 days", "DATE(timestamp)"),
+            "month": ("1 month", "DATE(timestamp)"),
+            "3month": ("3 months", "DATE(timestamp)"),
+            "6month": ("6 months", "DATE_TRUNC('week', DATE(timestamp))"),
+            "year": ("1 year", "DATE_TRUNC('week', DATE(timestamp))"),
+            "5year": ("5 years", "DATE_TRUNC('month', DATE(timestamp))"),
             "all": ("100 years", "DATE_TRUNC('month', DATE(timestamp))"),
         }
         
