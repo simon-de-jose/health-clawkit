@@ -16,9 +16,14 @@ from config import get_db_path
 DB_PATH = get_db_path()
 
 
-def import_medications_csv(csv_path):
+def import_medications_csv(csv_path, file_hash=None, is_reimport=False):
     """
     Import a Medications CSV into DuckDB.
+
+    Args:
+        csv_path: Path to CSV file
+        file_hash: SHA-256 hash of the file (for change detection)
+        is_reimport: True if re-importing a changed file
 
     Returns:
         int: Number of rows imported, or -1 on error
@@ -34,9 +39,9 @@ def import_medications_csv(csv_path):
     try:
         # Check if already imported
         existing = conn.execute(
-            "SELECT import_id FROM imports WHERE filename = ?", [filename]
+            "SELECT import_id, file_hash FROM imports WHERE filename = ?", [filename]
         ).fetchone()
-        if existing:
+        if existing and not is_reimport:
             print(f"⏭️  Already imported: {filename} (import_id={existing[0]})")
             return 0
 
@@ -81,16 +86,25 @@ def import_medications_csv(csv_path):
         rows_after = conn.execute("SELECT COUNT(*) FROM medications").fetchone()[0]
         rows_added = rows_after - rows_before
 
-        conn.execute("""
-            INSERT INTO imports (filename, imported_at, rows_added, source)
-            VALUES (?, ?, ?, 'medications')
-        """, [filename, datetime.now(), rows_added])
-
-        import_id = conn.execute(
-            "SELECT import_id FROM imports WHERE filename = ?", [filename]
-        ).fetchone()[0]
-
-        print(f"✅ Imported {rows_added} medication records (import_id={import_id})")
+        # Log import (insert or update depending on whether this is a re-import)
+        if is_reimport and existing:
+            conn.execute("""
+                UPDATE imports 
+                SET imported_at = ?, rows_added = ?, file_hash = ?
+                WHERE filename = ?
+            """, [datetime.now(), rows_added, file_hash, filename])
+            import_id = existing[0]
+            print(f"✅ Re-imported {rows_added} medication records (import_id={import_id}, updated hash)")
+        else:
+            conn.execute("""
+                INSERT INTO imports (filename, imported_at, rows_added, source, file_hash)
+                VALUES (?, ?, ?, 'medications', ?)
+            """, [filename, datetime.now(), rows_added, file_hash])
+            import_id = conn.execute(
+                "SELECT import_id FROM imports WHERE filename = ?", [filename]
+            ).fetchone()[0]
+            print(f"✅ Imported {rows_added} medication records (import_id={import_id})")
+        
         return rows_added
 
     except Exception as e:
