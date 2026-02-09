@@ -27,6 +27,9 @@ env/
 # Config (contains personal paths)
 config.yaml
 
+# Private project plan (contains personal health goals)
+PLAN.md
+
 # Logs
 *.log
 logs/
